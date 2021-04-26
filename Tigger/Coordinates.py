@@ -220,8 +220,16 @@ def get_wcs_info(hdr):
             ra_axis = iaxis
         elif name.startswith("DEC"):
             dec_axis = iaxis
-    wcs = WCS(hdr)  
-    refsky = wcs.wcs_pix2world([refpix], 0)[0,:]    
+    wcs = WCS(hdr)
+    # use WCS pixel information to build refsky
+    wcs_pixel = wcs.pixel_shape
+    refsky_list = []
+    for ipixel in range(naxis):
+        if ipixel < 2:
+            refsky_list.append(int(wcs_pixel[ipixel]/2))
+        else:
+            refsky_list.append(wcs_pixel[ipixel])
+    refsky = wcs.wcs_pix2world([refsky_list], 0)[0, :]
     return wcs, refpix, refsky, ra_axis, dec_axis
 
 
@@ -241,16 +249,22 @@ class Projection(object):
 
             try:
                 self.wcs, self.refpix, self.refsky, self.ra_axis, self.dec_axis = get_wcs_info(header)
+                print(f"refpix {self.refpix} refsky {self.refsky}")
                 if self.ra_axis is None or self.dec_axis is None:
                     raise RuntimeError("Missing RA or DEC axis")
                 ra0, dec0 = self.refsky[self.ra_axis], self.refsky[self.dec_axis]
+                print(f"ra0 dec0 {ra0, dec0}")
                 self.xpix0, self.ypix0 = self.refpix[self.ra_axis], self.refpix[self.dec_axis]
                 refpix1 = np.array(self.refpix).copy()
                 refpix1[self.ra_axis] += 1
                 refpix1[self.dec_axis] += 1
                 delta = self.wcs.wcs_pix2world([refpix1], 0)[0] - self.refsky
-                self.xscale = delta[self.ra_axis] * DEG
+                self.xscale = -delta[self.ra_axis + 1] * DEG
                 self.yscale = delta[self.dec_axis] * DEG
+                alt_xscale = self.wcs.to_header()["CDELT{}".format(self.ra_axis + 1)] * DEG
+                alt_yscale = self.wcs.to_header()["CDELT{}".format(self.dec_axis + 1)] * DEG
+                print(f"NEW tigger-lsm ra0 {ra0}, dec0 {dec0}, xpix0 {self.xpix0}, ypix0 {self.ypix0}, xscale {self.xscale}, yscale {self.yscale}, alt_xscale {alt_xscale}, alt_yscale {alt_yscale}")
+                print(f"shape array {self.wcs.array_shape}, pixel {self.wcs.pixel_shape}")
                 has_projection = True
             except Exception as exc:
                 traceback.print_exc()
@@ -262,7 +276,7 @@ class Projection(object):
 
         def lm(self, ra, dec):
             if not self.has_projection():
-                print(f"Coordinates def lm() does not have projection")
+                print(f"DEFAULT Coordinates def lm() does not have projection")
                 return numpy.sin(ra) / self.xscale, numpy.sin(dec) / self.yscale
             if numpy.isscalar(ra) and numpy.isscalar(dec):
                 if ra - self.ra0 > math.pi:
@@ -344,8 +358,8 @@ class Projection(object):
             Projection.FITSWCSpix.__init__(self, header)
             self._l0 = self.refpix[self.ra_axis]
             self._m0 = self.refpix[self.dec_axis]
-            self.xscale = self.wcs.to_header()["CDELT{}".format(self.ra_axis + 1)] * DEG
-            self.yscale = self.wcs.to_header()["CDELT{}".format(self.dec_axis + 1)] * DEG
+            #self.xscale = self.wcs.to_header()["CDELT{}".format(self.ra_axis + 1)] * DEG
+            #self.yscale = self.wcs.to_header()["CDELT{}".format(self.dec_axis + 1)] * DEG
 
 
         def old_lm(self, ra, dec):
@@ -355,7 +369,7 @@ class Projection(object):
         def lm(self, ra, dec):
             if not self.has_projection():
                 print(f"Coordinates def lm() does not have projection")
-                return -numpy.sin(ra) / self.xscale, numpy.sin(dec) / self.yscale
+                #return -numpy.sin(ra) / self.xscale, numpy.sin(dec) / self.yscale
             if numpy.isscalar(ra) and numpy.isscalar(dec):
                 print(f"Coordinates def lm() is scalar")
                 if ra - self.ra0 > math.pi:
