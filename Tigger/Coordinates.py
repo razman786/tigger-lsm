@@ -248,6 +248,7 @@ class Projection(object):
                 header = pyfits.open(header)[0].header
 
             try:
+                print(header)
                 self.wcs, self.refpix, self.refsky, self.ra_axis, self.dec_axis = get_wcs_info(header)
                 print(f"refpix {self.refpix} refsky {self.refsky}")
                 if self.ra_axis is None or self.dec_axis is None:
@@ -260,7 +261,7 @@ class Projection(object):
                 refpix1[self.dec_axis] += 1
                 delta = self.wcs.wcs_pix2world([refpix1], 0)[0] - self.refsky
                 print(f"delta {delta}")
-                self.xscale = delta[self.ra_axis + 1] * DEG
+                self.xscale = -delta[self.ra_axis + 1] * DEG
                 self.yscale = delta[self.dec_axis] * DEG
                 alt_xscale = self.wcs.to_header()["CDELT{}".format(self.ra_axis + 1)] * DEG
                 alt_yscale = self.wcs.to_header()["CDELT{}".format(self.dec_axis + 1)] * DEG
