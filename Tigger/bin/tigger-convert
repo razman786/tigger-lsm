@@ -339,9 +339,13 @@ is a Tigger model (-f switch must be specified to allow overwriting), or else a 
 
     # figure out center and recenter option
     if options.recenter:
+        print(f"options.recenter {options.recenter}")
         recenter_radec = convert_coordinates(options.recenter)
+        print(f"options.recenter radec {recenter_radec}")
     if options.center:
+        print(f"options.center {options.center}")
         center_radec = convert_coordinates(options.center)
+        print(f"options.center radec {center_radec}")
         options.refresh_r = True
     else:
         center_radec = None
@@ -519,7 +523,7 @@ is a Tigger model (-f switch must be specified to allow overwriting), or else a 
             # add brick
             from astropy.io import fits as pyfits
             from astLib.astWCS import WCS
-
+            print("Does this get called!!> add_brick")
             input_hdu = pyfits.open(fitsfile)[0]
             hdr = input_hdu.header
             max_flux = float(input_hdu.data.max())

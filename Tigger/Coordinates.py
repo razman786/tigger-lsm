@@ -261,12 +261,8 @@ class Projection(object):
                 refpix1[self.dec_axis] += 1
                 delta = self.wcs.wcs_pix2world([refpix1], 0)[0] - self.refsky
                 print(f"delta {delta}")
-                self.xscale = -delta[self.ra_axis + 1] * DEG
+                self.xscale = delta[self.ra_axis] * DEG  # -xscale already in tigger
                 self.yscale = delta[self.dec_axis] * DEG
-                alt_xscale = self.wcs.to_header()["CDELT{}".format(self.ra_axis + 1)] * DEG
-                alt_yscale = self.wcs.to_header()["CDELT{}".format(self.dec_axis + 1)] * DEG
-                print(f"NEW tigger-lsm ra0 {ra0}, dec0 {dec0}, xpix0 {self.xpix0}, ypix0 {self.ypix0}, xscale {self.xscale}, yscale {self.yscale}, alt_xscale {alt_xscale}, alt_yscale {alt_yscale}")
-                print(f"shape array {self.wcs.array_shape}, pixel {self.wcs.pixel_shape}")
                 has_projection = True
             except Exception as exc:
                 traceback.print_exc()
@@ -360,9 +356,18 @@ class Projection(object):
             Projection.FITSWCSpix.__init__(self, header)
             self._l0 = self.refpix[self.ra_axis]
             self._m0 = self.refpix[self.dec_axis]
-            #self.xscale = self.wcs.to_header()["CDELT{}".format(self.ra_axis + 1)] * DEG
-            #self.yscale = self.wcs.to_header()["CDELT{}".format(self.dec_axis + 1)] * DEG
-
+            refpix1 = np.array(self.refpix).copy()
+            refpix1[self.ra_axis] += 1
+            refpix1[self.dec_axis] += 1
+            delta = self.wcs.wcs_pix2world([refpix1], 0)[0] - self.refsky
+            print(f"delta {delta}")
+            self.xscale = delta[self.ra_axis + 1] * DEG  # -xscale already in tigger
+            self.yscale = delta[self.dec_axis] * DEG
+            # alt_xscale = self.wcs.to_header()["CDELT{}".format(self.ra_axis + 1)] * DEG
+            # alt_yscale = self.wcs.to_header()["CDELT{}".format(self.dec_axis + 1)] * DEG
+            print(
+                f"NEW tigger-lsm ra0 {self.ra0}, dec0 {self.dec0}, xpix0 {self.xpix0}, ypix0 {self.ypix0}, xscale {self.xscale}, yscale {self.yscale}")  # , alt_xscale {alt_xscale}, alt_yscale {alt_yscale}")
+            print(f"shape array {self.wcs.array_shape}, pixel {self.wcs.pixel_shape}")
 
         def old_lm(self, ra, dec):
             l, m = super().lm(ra, dec)
