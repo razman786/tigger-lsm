@@ -361,7 +361,7 @@ class Projection(object):
             refpix1[self.dec_axis] += 1
             delta = self.wcs.wcs_pix2world([refpix1], 0)[0] - self.refsky
             print(f"delta {delta}")
-            self.xscale = delta[self.ra_axis + 1] * DEG  # -xscale already in tigger
+            self.xscale = -delta[self.ra_axis + 1] * DEG  # -xscale already in tigger
             self.yscale = delta[self.dec_axis] * DEG
             # alt_xscale = self.wcs.to_header()["CDELT{}".format(self.ra_axis + 1)] * DEG
             # alt_yscale = self.wcs.to_header()["CDELT{}".format(self.dec_axis + 1)] * DEG
