@@ -213,15 +213,23 @@ class _Projector(object):
 def get_wcs_info(hdr):
     naxis = hdr['NAXIS']
     ra_axis = dec_axis = None
-    refpix = [hdr["CRPIX%d" % (iaxis+1)]-1 for iaxis in range(naxis)]
+    refpix_old = refpix = [hdr["CRPIX%d" % (iaxis+1)]-1 for iaxis in range(naxis)]
+    # refpix should be minus 1 for only x/y coordinates?
+    newrefpix = []
+    for iaxis in range(naxis):
+        if iaxis < 2:
+            newrefpix.append(hdr["CRPIX%d" % (iaxis+1)]-1)
+        else:
+            newrefpix.append(hdr["CRPIX%d" % (iaxis+1)])
+    refpix = newrefpix
     for iaxis in range(naxis):
         name = hdr.get("CTYPE%d" % (iaxis+1), '').upper()
         if name.startswith("RA"):
             ra_axis = iaxis
         elif name.startswith("DEC"):
             dec_axis = iaxis
-    wcs = WCS(hdr)
     # use WCS pixel information to build refsky
+    wcs = WCS(hdr)
     wcs_pixel = wcs.pixel_shape
     refsky_list = []
     for ipixel in range(naxis):
@@ -230,6 +238,19 @@ def get_wcs_info(hdr):
         else:
             refsky_list.append(wcs_pixel[ipixel])
     refsky = wcs.wcs_pix2world([refsky_list], 0)[0, :]
+    # debug output
+    refsky_old = wcs.wcs_pix2world([refpix_old], 0)[0, :]
+    print(f"NAXIS is {naxis}")
+    print(f"old refpix {refpix} new refpix {newrefpix}")
+    print(f"old refsky {refsky_old} new refsky {refsky}")
+    ra0, dec0 = refsky[ra_axis], refsky[dec_axis]
+    ra0_old, dec0_old = refsky_old[ra_axis], refsky_old[dec_axis]
+    refcoord = hdr['CRVAL1'], hdr['CRVAL2']
+    print(f"old ra0, dec0 {ra0_old, dec0_old}, new refsky ra0, dec0 {ra0, dec0}, from WCS ra0, dec0 {refcoord[0], refcoord[1]}")
+    print("==== START WCS HEADER ====")
+    print(wcs.wcs.print_contents())
+    print("==== END WCS HEADER ====")
+    # end debug output
     return wcs, refpix, refsky, ra_axis, dec_axis
 
 
@@ -248,21 +269,29 @@ class Projection(object):
                 header = pyfits.open(header)[0].header
 
             try:
-                print(header)
                 self.wcs, self.refpix, self.refsky, self.ra_axis, self.dec_axis = get_wcs_info(header)
-                print(f"refpix {self.refpix} refsky {self.refsky}")
                 if self.ra_axis is None or self.dec_axis is None:
                     raise RuntimeError("Missing RA or DEC axis")
                 ra0, dec0 = self.refsky[self.ra_axis], self.refsky[self.dec_axis]
-                print(f"ra0 dec0 {ra0, dec0}")
+                ra0_wcs, dec0_wcs = header['CRVAL1'], header['CRVAL2']
                 self.xpix0, self.ypix0 = self.refpix[self.ra_axis], self.refpix[self.dec_axis]
                 refpix1 = np.array(self.refpix).copy()
                 refpix1[self.ra_axis] += 1
                 refpix1[self.dec_axis] += 1
                 delta = self.wcs.wcs_pix2world([refpix1], 0)[0] - self.refsky
-                print(f"delta {delta}")
-                self.xscale = delta[self.ra_axis] * DEG  # -xscale already in tigger
+                self.xscale = delta[self.ra_axis] * DEG
                 self.yscale = delta[self.dec_axis] * DEG
+                pixarea = abs(header["CDELT1"] * header["CDELT2"])
+                pixscale = (header["CDELT1"], header["CDELT2"])
+                print(f"astropy pixarea {pixarea}")
+                print(f"old xscale {self.xscale} yscale {self.yscale}")
+                delta = self.wcs.wcs_pix2world([refpix1], 0)[0] - self.refsky
+                self.xscale = pixscale[self.ra_axis] * DEG
+                self.yscale = pixscale[self.dec_axis] * DEG
+                print(f"new xscale {self.xscale} yscale {self.yscale}")
+                print(f"old ra0, dec0 {ra0, dec0}, WCS ra0, dec0 {ra0_wcs, dec0_wcs}")
+                print(f"old ra0, dec0 in DEG {ra0 * DEG}, {dec0 * DEG}")
+                print(f"WCS ra0, dec0 in DEG {ra0_wcs * DEG}, {dec0_wcs * DEG}")
                 has_projection = True
             except Exception as exc:
                 traceback.print_exc()
@@ -356,18 +385,24 @@ class Projection(object):
             Projection.FITSWCSpix.__init__(self, header)
             self._l0 = self.refpix[self.ra_axis]
             self._m0 = self.refpix[self.dec_axis]
-            refpix1 = np.array(self.refpix).copy()
+            """refpix1 = np.array(self.refpix).copy()
             refpix1[self.ra_axis] += 1
             refpix1[self.dec_axis] += 1
             delta = self.wcs.wcs_pix2world([refpix1], 0)[0] - self.refsky
-            print(f"delta {delta}")
-            self.xscale = -delta[self.ra_axis + 1] * DEG  # -xscale already in tigger
+            self.xscale = -delta[self.ra_axis + 1] * DEG
             self.yscale = delta[self.dec_axis] * DEG
             # alt_xscale = self.wcs.to_header()["CDELT{}".format(self.ra_axis + 1)] * DEG
             # alt_yscale = self.wcs.to_header()["CDELT{}".format(self.dec_axis + 1)] * DEG
             print(
                 f"NEW tigger-lsm ra0 {self.ra0}, dec0 {self.dec0}, xpix0 {self.xpix0}, ypix0 {self.ypix0}, xscale {self.xscale}, yscale {self.yscale}")  # , alt_xscale {alt_xscale}, alt_yscale {alt_yscale}")
             print(f"shape array {self.wcs.array_shape}, pixel {self.wcs.pixel_shape}")
+            refpix = header['CRPIX1'], header['CRPIX2']
+            refcoord = header['CRVAL1'], header['CRVAL2']
+            print(f"astropy refpix {refpix} tigger {self.refpix}")
+            print(f"astropy refcoord {refcoord}")
+            pixarea = abs(header["CDELT1"] * header["CDELT2"])
+            pixscale = (header["CDELT1"], header["CDELT2"])
+            print(f"astropy pixarea {pixarea} pixscale {pixscale[self.ra_axis] * DEG, pixscale[self.dec_axis] * DEG}")"""
 
         def old_lm(self, ra, dec):
             l, m = super().lm(ra, dec)
