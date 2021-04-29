@@ -231,6 +231,7 @@ def get_wcs_info(hdr):
     # use WCS pixel information to build refsky
     wcs = WCS(hdr)
     wcs_pixel = wcs.pixel_shape
+    print(f"WCS Pixel shape is {wcs_pixel}")
     refsky_list = []
     for ipixel in range(naxis):
         if ipixel < 2:
