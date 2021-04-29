@@ -241,12 +241,12 @@ def get_wcs_info(hdr):
     # debug output
     refsky_old = wcs.wcs_pix2world([refpix_old], 0)[0, :]
     print(f"NAXIS is {naxis}")
-    print(f"old refpix {refpix} new refpix {newrefpix}")
+    print(f"old refpix {refpix_old} new refpix {newrefpix}")
     print(f"old refsky {refsky_old} new refsky {refsky}")
-    ra0, dec0 = refsky[ra_axis], refsky[dec_axis]
+    ra0_new, dec0_new = refsky[ra_axis], refsky[dec_axis]
     ra0_old, dec0_old = refsky_old[ra_axis], refsky_old[dec_axis]
-    refcoord = hdr['CRVAL1'], hdr['CRVAL2']
-    print(f"old ra0, dec0 {ra0_old, dec0_old}, new refsky ra0, dec0 {ra0, dec0}, from WCS ra0, dec0 {refcoord[0], refcoord[1]}")
+    ra0, dec0 = hdr['CRVAL1'], hdr['CRVAL2']
+    print(f"old ra0, dec0 {ra0_old, dec0_old}, new refsky ra0, dec0 {ra0_new, dec0_new}, from WCS ra0, dec0 {ra0, dec0}")
     print("==== START WCS HEADER ====")
     print(wcs.wcs.print_contents())
     print("==== END WCS HEADER ====")
