@@ -378,74 +378,35 @@ class Projection(object):
             self._l0 = self.refpix[self.ra_axis]
             self._m0 = self.refpix[self.dec_axis]
 
-        def lm(self, ra, dec):
-            coord = SkyCoord(ra=ra*u.rad, dec=dec*u.rad, frame='fk5')
-            cpixels = utils.skycoord_to_pixel(coords=coord, wcs=self.wcs.celestial, origin=0, mode='all')
-            l, m = cpixels[0], cpixels[1]
-            """if not self.has_projection():
-                return -numpy.sin(ra) / self.xscale, numpy.sin(dec) / self.yscale
-            if numpy.isscalar(ra) and numpy.isscalar(dec):
-                if ra - self.ra0 > math.pi:
-                    ra -= 2 * math.pi
-                if ra - self.ra0 < -math.pi:
-                    ra += 2 * math.pi
-                skyvec = np.array(self.refsky).copy()
-                skyvec[self.ra_axis] = ra / DEG
-                skyvec[self.dec_axis] = dec / DEG
-                pixvec = self.wcs.wcs_world2pix([skyvec], 0)[0]
-                if np.isnan(np.sum(pixvec)):
-                    l, m = -0.0, 0.0
-                else:
-                    l, m = pixvec[self.ra_axis], pixvec[self.dec_axis]
+            # get equinox for SkyCoord frame type
+            frame = utils.wcs_to_celestial_frame(self.wcs)
+            equinox = frame.equinox
+            if equinox.format == 'jyear' or equinox.format == 'jyear_str':
+                self.frame_type = 'fk5'
+            elif equinox.format == 'byear' or equinox.format == 'byear_str':  # is fk4 needed? If so, requires testing.
+                self.frame_type = 'fk4'
             else:
-                if numpy.isscalar(ra):
-                    ra = numpy.array(ra)
-                if numpy.isscalar(dec):
-                    dec = numpy.array(dec)
-                n = max(len(ra), len(dec))
-                skymat = numpy.array([self.refsky for _ in range(n)])
-                skymat[:, self.ra_axis] = ra / DEG
-                skymat[:, self.dec_axis] = dec / DEG
-                ra = skymat[:, self.ra_axis]
-                ra[ra - self.ra0 > 180] -= 360
-                ra[ra - self.ra0 < -180] += 360
-                ## when fed in arrays of ra/dec, wcs.wcs2pix will return a nested list of
-                ## [[l1,m1],[l2,m2],,...]. Convert this to an array and extract columns.
-                lm = self.wcs.wcs_world2pix([skymat], 0)
-                l, m = lm[:, self.ra_axis], lm[:, self.dec_axis]"""
+                # SkyCoord default frame type
+                self.frame_type = 'icrs'
+
+        def lm(self, ra, dec):
+            coord = SkyCoord(ra=ra * u.rad, dec=dec * u.rad, frame=self.frame_type)
+            coord_pixels = utils.skycoord_to_pixel(coords=coord, wcs=self.wcs, origin=0, mode='all')
+            if np.isnan(np.sum(coord_pixels)):
+                l, m = -0.0, 0.0
+            else:
+                l, m = coord_pixels[self.ra_axis], coord_pixels[self.dec_axis]
             l = (l - self._l0) * self.xscale
             m = (m - self._m0) * self.yscale
-            print(f"tigger lm {type(l), l, m}")
             return l, m
 
         def radec(self, l, m):
-            print(f"dec l {l} m {m}")
             x = self.xpix0 - l / self.xscale
             y = self.ypix0 + m / self.yscale
-            coord = utils.pixel_to_skycoord(xp=x, yp=y, wcs=self.wcs.celestial, origin=0, mode='all')
-            #coord = SkyCoord.from_pixel(xp=x, yp=y, wcs=self.wcs, origin=0, mode='all')
-            print(f"dec x y {x, y}")
-            print(f"dec coord {type(coord), coord.ra.value, coord.dec.value}")
+            coord = utils.pixel_to_skycoord(xp=x, yp=y, wcs=self.wcs, origin=0, mode='all')
             ra = coord.ra.value
             dec = coord.dec.value
-            print(f" dec output ra {type(ra), ra * DEG} dec {dec * DEG}")
             return ra * DEG, dec * DEG
-            """if not self.has_projection():
-                return numpy.arcsin(-l), numpy.arcsin(m)
-            if numpy.isscalar(l) and numpy.isscalar(m):
-                pixvec = np.array(self.refpix).copy()
-                pixvec[self.ra_axis] = self.xpix0 - l / self.xscale
-                pixvec[self.dec_axis] = self.ypix0 + m / self.yscale
-                skyvec = self.wcs.wcs_pix2world([pixvec], 0)[0]
-                ra, dec = skyvec[self.ra_axis], skyvec[self.dec_axis]
-            else:
-                print("ERROR: tigger-lsm: Coordinates.py: radec(), l m is non-scalar")
-                # old tigger-lsm code that uses astLib
-                # radec = numpy.array(self.wcs.pix2wcs(self.xpix0 - l / self.xscale, self.ypix0 + m / self.yscale))
-                # ra = radec[..., 0]
-                # dec = radec[..., 1]"""
-            #print(f" dec output ra {ra} dec {dec}")
-            #return ra * DEG, dec * DEG
 
         def offset(self, dra, ddec):
             return dra, ddec  # removed sin()'s from this method to match the old tigger-lsm
