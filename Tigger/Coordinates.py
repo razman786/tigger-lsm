@@ -62,6 +62,9 @@ import locale
 locale.setlocale(locale.LC_NUMERIC, 'C')
 
 from astropy.wcs import WCS, FITSFixedWarning
+from astropy.coordinates import SkyCoord
+from astropy import units as u
+from astropy.wcs import utils
 import PyWCSTools.wcs
 
 startup_dprint(1, "imported WCS")
@@ -376,7 +379,10 @@ class Projection(object):
             self._m0 = self.refpix[self.dec_axis]
 
         def lm(self, ra, dec):
-            if not self.has_projection():
+            coord = SkyCoord(ra=ra*u.rad, dec=dec*u.rad, frame='fk5')
+            cpixels = utils.skycoord_to_pixel(coords=coord, wcs=self.wcs.celestial, origin=0, mode='all')
+            l, m = cpixels[0], cpixels[1]
+            """if not self.has_projection():
                 return -numpy.sin(ra) / self.xscale, numpy.sin(dec) / self.yscale
             if numpy.isscalar(ra) and numpy.isscalar(dec):
                 if ra - self.ra0 > math.pi:
@@ -406,13 +412,25 @@ class Projection(object):
                 ## when fed in arrays of ra/dec, wcs.wcs2pix will return a nested list of
                 ## [[l1,m1],[l2,m2],,...]. Convert this to an array and extract columns.
                 lm = self.wcs.wcs_world2pix([skymat], 0)
-                l, m = lm[:, self.ra_axis], lm[:, self.dec_axis]
+                l, m = lm[:, self.ra_axis], lm[:, self.dec_axis]"""
             l = (l - self._l0) * self.xscale
             m = (m - self._m0) * self.yscale
+            print(f"tigger lm {type(l), l, m}")
             return l, m
 
         def radec(self, l, m):
-            if not self.has_projection():
+            print(f"dec l {l} m {m}")
+            x = self.xpix0 - l / self.xscale
+            y = self.ypix0 + m / self.yscale
+            coord = utils.pixel_to_skycoord(xp=x, yp=y, wcs=self.wcs.celestial, origin=0, mode='all')
+            #coord = SkyCoord.from_pixel(xp=x, yp=y, wcs=self.wcs, origin=0, mode='all')
+            print(f"dec x y {x, y}")
+            print(f"dec coord {type(coord), coord.ra.value, coord.dec.value}")
+            ra = coord.ra.value
+            dec = coord.dec.value
+            print(f" dec output ra {type(ra), ra * DEG} dec {dec * DEG}")
+            return ra * DEG, dec * DEG
+            """if not self.has_projection():
                 return numpy.arcsin(-l), numpy.arcsin(m)
             if numpy.isscalar(l) and numpy.isscalar(m):
                 pixvec = np.array(self.refpix).copy()
@@ -425,8 +443,9 @@ class Projection(object):
                 # old tigger-lsm code that uses astLib
                 # radec = numpy.array(self.wcs.pix2wcs(self.xpix0 - l / self.xscale, self.ypix0 + m / self.yscale))
                 # ra = radec[..., 0]
-                # dec = radec[..., 1]
-            return ra * DEG, dec * DEG
+                # dec = radec[..., 1]"""
+            #print(f" dec output ra {ra} dec {dec}")
+            #return ra * DEG, dec * DEG
 
         def offset(self, dra, ddec):
             return dra, ddec  # removed sin()'s from this method to match the old tigger-lsm
