@@ -336,17 +336,23 @@ class Projection(object):
     ## RAZ 19/4/2021: FITSWCS is still needed by Tigger v1.6.0. The SinWCS Class was not compatible with Tigger v1.6.0.
     ## Tigger *does* use FITSWCS for coordinate conversions.
 
-    class FITSWCS(FITSWCSpix):
+    class FITSWCS(_Projector):
         """FITS WCS projection used by Tigger v1.6.0, as determined by a FITS header.
         lm is renormalized to radians, l is reversed, 0,0 is at reference pixel.
         """
 
         def __init__(self, header):
             """Constructor. Create from filename (treated as FITS file), or a FITS header object"""
-            Projection.FITSWCSpix.__init__(self, header)
             # init() has been modified to be a self contained workaround for Tigger v1.6.0
+            # get astropy WCS
+            self.wcs = WCS(header)
+            print(f"WCS {self.wcs.printwcs()}")
+
             # get number of axis
+            # Test file model/2015/combined-4M5S.fits has NAXIS = 3 and WCS AXES = 4,
+            # pix2world then fails expecting N x 4. Using astropy wcs methods avoids the reliance on naxis
             naxis = header['NAXIS']
+            print(f"naxis {naxis}")
 
             # get ra and dec axis
             self.ra_axis = self.dec_axis = None
@@ -356,27 +362,39 @@ class Projection(object):
                     self.ra_axis = iaxis
                 elif name.startswith("DEC"):
                     self.dec_axis = iaxis
+            print(f"ra_axis, dec_axis {self.ra_axis, self.dec_axis}")
 
             # get refpix
-            self.refpix = [header["CRPIX%d" % (iaxis + 1)] - 1 for iaxis in range(naxis)]
+            crpix = self.wcs.wcs.crpix
+            self.refpix = crpix - 1
+            print(f"refpix {self.refpix, crpix}")
 
             # get refsky
             self.refsky = self.wcs.wcs_pix2world([self.refpix], 0)[0, :]
+            print(f"refsky {self.refsky}")
+
+            # get ra0, dec0
+            ra0, dec0 = self.refsky[self.ra_axis], self.refsky[self.dec_axis]
+            print(f" ra0, dec0 {ra0, dec0}")
 
             # set centre x/y pixels
             self.xpix0, self.ypix0 = self.refpix[self.ra_axis], self.refpix[self.dec_axis]
+            print(f"xpix0, ypix0 {self.xpix0, self.ypix0}")
 
             # set x/y scales
             pix_scales = self.wcs.wcs.cdelt
             self.xscale = pix_scales[self.ra_axis] * DEG
             self.yscale = pix_scales[self.dec_axis] * DEG
-
-            # set projection
-            has_projection = True
+            print(f"x/yscales {self.xscale, self.yscale}")
 
             # set l0, m0
             self._l0 = self.refpix[self.ra_axis]
             self._m0 = self.refpix[self.dec_axis]
+            print(f"l/m0 {self._l0, self._m0}")
+
+            # set projection
+            has_projection = True
+            _Projector.__init__(self, ra0 * DEG, dec0 * DEG, has_projection=has_projection)
 
         def lm(self, ra, dec):
             coord = SkyCoord(ra=ra * u.rad, dec=dec * u.rad)
@@ -401,6 +419,12 @@ class Projection(object):
             # old tigger-lsm had return dra, ddec
             # using new tigger-lsm SinWCS default
             return sin(dra), sin(ddec)
+
+        def __eq__(self, other):
+            """By default, two projections are the same if their classes match, and their ra0/dec0 match."""
+            return type(self) is type(other) and (
+                self.ra0, self.dec0, self.xpix0, self.ypix0, self.xscale, self.yscale) == (
+                       other.ra0, other.dec0, other.xpix0, other.ypix0, other.xscale, other.yscale)
 
     @staticmethod
     def FITSWCS_static(ra0, dec0):
