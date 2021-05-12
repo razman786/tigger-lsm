@@ -364,8 +364,7 @@ class Projection(object):
                     self.dec_axis = iaxis
 
             # get refpix
-            crpix = self.wcs.wcs.crpix
-            self.refpix = crpix - 1
+            self.refpix = self.wcs.wcs.crpix - 1
 
             # get refsky
             self.refsky = self.wcs.wcs_pix2world([self.refpix], 0)[0, :]
@@ -411,7 +410,9 @@ class Projection(object):
         def offset(self, dra, ddec):
             # old tigger-lsm had 'return dra, ddec'
             # using new tigger-lsm SinWCS default
-            return sin(dra), sin(ddec)
+            # return sin(dra), sin(ddec)
+            coord = SkyCoord(ra=dra * u.rad, dec=ddec * u.rad)
+
 
         def __eq__(self, other):
             """By default, two projections are the same if their classes match, and their ra0/dec0 match."""
