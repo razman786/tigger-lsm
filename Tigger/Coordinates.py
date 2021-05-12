@@ -378,19 +378,8 @@ class Projection(object):
             self._l0 = self.refpix[self.ra_axis]
             self._m0 = self.refpix[self.dec_axis]
 
-            # get equinox for SkyCoord frame type
-            frame = utils.wcs_to_celestial_frame(self.wcs)
-            equinox = frame.equinox
-            if equinox.format == 'jyear' or equinox.format == 'jyear_str':
-                self.frame_type = 'fk5'
-            elif equinox.format == 'byear' or equinox.format == 'byear_str':  # is fk4 needed? If so, requires testing.
-                self.frame_type = 'fk4'
-            else:
-                # SkyCoord default frame type
-                self.frame_type = 'icrs'
-
         def lm(self, ra, dec):
-            coord = SkyCoord(ra=ra * u.rad, dec=dec * u.rad, frame=self.frame_type)
+            coord = SkyCoord(ra=ra * u.rad, dec=dec * u.rad)
             coord_pixels = utils.skycoord_to_pixel(coords=coord, wcs=self.wcs, origin=0, mode='all')
             if np.isnan(np.sum(coord_pixels)):
                 l, m = -0.0, 0.0
@@ -409,7 +398,9 @@ class Projection(object):
             return ra * DEG, dec * DEG
 
         def offset(self, dra, ddec):
-            return dra, ddec  # removed sin()'s from this method to match the old tigger-lsm
+            # old tigger-lsm had return dra, ddec
+            # using new tigger-lsm SinWCS default
+            return sin(dra), sin(ddec)
 
     @staticmethod
     def FITSWCS_static(ra0, dec0):
