@@ -372,6 +372,9 @@ class Projection(object):
             # get ra0, dec0
             ra0, dec0 = self.refsky[self.ra_axis], self.refsky[self.dec_axis]
 
+            self.centre_coord = SkyCoord(ra=ra0*u.degree, dec=dec0*u.degree)
+            print(f"centre coord {self.centre_coord.ra}")
+
             # set centre x/y pixels
             self.xpix0, self.ypix0 = self.refpix[self.ra_axis], self.refpix[self.dec_axis]
 
@@ -411,8 +414,17 @@ class Projection(object):
             # old tigger-lsm had 'return dra, ddec'
             # using new tigger-lsm SinWCS default
             # return sin(dra), sin(ddec)
-            coord = SkyCoord(ra=dra * u.rad, dec=ddec * u.rad)
 
+            coord = SkyCoord(ra=dra * u.rad, dec=ddec * u.rad)
+            """coord = SkyCoord(ra=dra * u.rad, dec=ddec * u.rad)
+            coord_dis = self.centre_coord.directional_offset_by(dra, ddec)
+            print(coord.to_pixel(wcs=self.wcs, origin=0, mode='all'))"""
+            #ra, dec = self.centre_coord.spherical_offsets_to(coord)
+            #ra, dec = coord.spherical_offsets_to(self.centre_coord)
+            ra = coord.position_angle(self.centre_coord)
+            print(f"offset ra, dec {ra}")
+            print(f" old offset sin(ra/dec) {sin(dra), sin(ddec)}")
+            return sin(dra), sin(ddec)
 
         def __eq__(self, other):
             """By default, two projections are the same if their classes match, and their ra0/dec0 match."""
